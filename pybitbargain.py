@@ -28,6 +28,7 @@ class BitBargain():
     def __init__(self, login, api_key):
         self.login = login
         self.api_key = api_key
+        self.setUserAgent()
 
     def _post(self, URL, data={}):
         data["login"] = self.login
@@ -35,12 +36,15 @@ class BitBargain():
         data = urllib.parse.urlencode(data)
         data = data.encode('utf-8')
         request = urllib.request.Request(URL)
-        request.add_header("Content-Type","application/x-www-form-urlencoded;charset=utf-8")
+        request.add_header("Content-Type", "application/x-www-form-urlencoded;charset=utf-8")
+        request.add_header("User-Agent", self.agent)
         f = urllib.request.urlopen(request, data)
         response = f.read()
         response = response.decode('utf-8')
         return json.loads(response)
-        
+
+    def setUserAgent(self, agent="Library"):
+        self.agent = "pyBitBargain (%s)" % (agent)
 
     def getStatus(self, keepalive=False):
         return self._post(STATUS_URL, {'keepalive' : int(keepalive)})
@@ -59,6 +63,8 @@ if __name__ == '__main__':
         exit()
 
     b = BitBargain(sys.argv[2], sys.argv[3])
+    b.setUserAgent("Command line tool")
+
     if sys.argv[1].lower() == 'status':
         print(json.dumps(b.getStatus(), sort_keys=True, indent=4))
     elif sys.argv[1].lower() == 'status-keepalive':
