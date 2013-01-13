@@ -21,6 +21,7 @@ import urllib.parse
 import json
 
 STATUS_URL  = "https://bitbargain.co.uk/api/status"
+TRADE_URL   = "https://bitbargain.co.uk/api/trades"
 ONLINE_URL  = "https://bitbargain.co.uk/api/write/online"
 OFFLINE_URL = "https://bitbargain.co.uk/api/write/offline"
 
@@ -42,6 +43,10 @@ class BitBargain():
         response = f.read()
         response = response.decode('utf-8')
         return json.loads(response)
+
+
+    def getTrades(self, **kwargs):
+        return self._post(TRADE_URL, kwargs)
 
     def setUserAgent(self, agent="Library"):
         self.agent = "pyBitBargain (%s)" % (agent)
@@ -73,6 +78,8 @@ if __name__ == '__main__':
         print(json.dumps(b.goOnline(), sort_keys=True, indent=4))
     elif sys.argv[1].lower() == 'offline':
         print(json.dumps(b.goOffline(), sort_keys=True, indent=4))
+    elif sys.argv[1].lower() == 'trades':
+        print(json.dumps(b.getTrades(), sort_keys=True, indent=4))
     else:
         print("Unknown command: %s" % (sys.argv[1]))
 
