@@ -35,88 +35,96 @@ class BitBargainBot(ClientXMPP):
         self.send_presence()
         self.get_roster()
 
+    def sendMsg(self, addr, text):
+        print('>>>', addr, text)
+        self.send_message(mto=addr, mbody=text)
+
     def message(self, msg):
+
         if msg['type'] in ('chat', 'normal'):
             addr, jid = str(msg["from"]).split("/")
 
             args = msg["body"].split()
+            print('<<<', addr, msg["body"])
 
             if args[0].lower() == 'register':
                 if len(args) != 3:
-                    msg.reply("Usage: register <username> <api key>").send()
+                    self.sendMsg(addr, "Usage: register <username> <api key>")
                     return
 
                 status = self.bbGetStatus(args[1], args[2])
                 if not status['success']:
-                    msg.reply("Failed to register: %s" % (status['response']['msg'])).send()
+                    self.sendMsg(addr, "Failed to register: %s" % (status['response']['msg']))
                     return
-                msg.reply("You have registered successfully").send()
+                self.sendMsg(addr, "You have registered successfully")
 
                 self.users[addr] = {}
                 self.users[addr] = { 'user'          : args[1],
                                      'api_key'       : args[2],
-                                     'keepalive'     : False,
                                      'seen_trades'   : [],
                                      'status'        : status }
-                f = open(PICKLE_PATH, 'wb')
-                pickle.dump(self.users, f)
-                f.close()
+                self.save()
                 print('New user! %s' % (addr))
 
-            elif args[0].lower() == 'online':
+            elif args[0].lower() in ['online', 'on']:
                 if addr not in self.users:
-                    msg.reply("You must register first!").send()
+                    self.sendMsg(addr, "You must register first!")
                     return
                 status = self.bbOnline(self.users[addr]['user'], self.users[addr]['api_key'])
                 if not status['success']:
-                    msg.reply("Failed to go online: %s" % (status['response']['msg'])).send()
+                    self.sendMsg(addr, "Failed to go online: %s" % (status['response']['msg']))
                     return
-                msg.reply("You are now online").send()
+                self.sendMsg(addr, "You are now online")
                 self.users[addr]['status']['response']['is_online'] = 1
 
-            elif args[0].lower() == 'offline':
+            elif args[0].lower() in ['offline', 'off']:
                 if addr not in self.users:
-                    msg.reply("You must register first!").send()
+                    self.sendMsg(addr, "You must register first!")
                     return
                 status = self.bbOffline(self.users[addr]['user'], self.users[addr]['api_key'])
                 if not status['success']:
-                    msg.reply("Failed to go offline: %s" % (status['response']['msg'])).send()
+                    self.sendMsg(addr, "Failed to go offline: %s" % (status['response']['msg']))
                     return
-                msg.reply("You are now offline").send()
+                self.sendMsg(addr, "You are now offline")
                 self.users[addr]['status']['response']['is_online'] = 0
 
-            elif args[0].lower() == 'keepalive':
-                if addr not in self.users:
-                    msg.reply("You must register first!").send()
-                    return
-                self.users[addr]['keepalive'] = not self.users[addr]['keepalive']
-                if self.users[addr]['keepalive']:
-                    msg.reply("Keeping the connection alive").send()
+            elif args[0].lower() in ['status', 's']:
+                status = self.bbGetStatus(self.users[addr]['user'], self.users[addr]['api_key'])
+                if status['response']['is_online']:
+                    self.sendMsg(addr, "You are currently online")
                 else:
-                    msg.reply("Stopping keeping the connection alive!").send()
-
+                    self.sendMsg(addr, "You are currently offline")
+                    
             else:
-                msg.reply("Unknown command, please use register, online, offline or keepalive.").send()
+                self.sendMsg(addr, "Unknown command, please use register, online, offline.")
 
+    def save(self):
+        f = open(PICKLE_PATH, 'wb')
+        pickle.dump(self.users, f)
+        f.close()
 
     def bbPoll(self, firstrun=False):
         for addr, data in self.users.items():
-            status = self.bbGetStatus(data['user'], data['api_key'], data['keepalive'])
+            try:
+                status = self.bbGetStatus(data['user'], data['api_key'])
+            except urllib.request.URLError as e:
+                print(e)
+                pass
             if not firstrun:
                 if data['status']['response']['last_trade_id'] != status['response']['last_trade_id']:
                     self.bbCheckTrades(addr)
                 if data['status']['response']['is_online'] != status['response']['is_online']:
                     if status['response']['is_online']:
-                        self.send_message(mto=addr, mbody='You are now online')
+                        self.sendMsg(addr, 'You are now online')
                     else:
-                        self.send_message(mto=addr, mbody='You are now offline')
+                        self.sendMsg(addr, 'You are now offline')
 
             data['status'] = status
 
-    def bbGetStatus(self, user, api_key, keepalive=False):
+    def bbGetStatus(self, user, api_key):
         bb = pybitbargain.BitBargain(user, api_key)
         bb.setUserAgent('XMPP Bot')
-        return bb.getStatus()
+        return bb.getStatus(True)
 
     def bbOnline(self, user, api_key):
         bb = pybitbargain.BitBargain(user, api_key)
@@ -139,7 +147,7 @@ class BitBargainBot(ClientXMPP):
         for trade in trades['response']:
             active_trades.append(trade['pub_id'])
             if trade['pub_id'] not in self.users[addr]['seen_trades']:
-                self.send_message(mto=addr, mbody='%s wants to buy %s %s for £%s (£%s each) via %s - %s' % (trade['buyer'], rmZeros(trade['amount']), trade['thing'], rmZeros(trade['price']), rmZeros(trade['price_unit']), trade['pay_method'], trade['url']))
+                self.sendMsg(addr, '%s wants to buy %s %s for £%s (£%s each) via %s - %s' % (trade['buyer'], rmZeros(trade['amount']), trade['thing'], rmZeros(trade['price']), rmZeros(trade['price_unit']), trade['pay_method'], trade['url']))
                 self.users[addr]['seen_trades'].append(trade['pub_id'])
 
         for trade in self.users[addr]['seen_trades']:
