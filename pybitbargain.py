@@ -24,6 +24,7 @@ STATUS_URL  = "https://bitbargain.co.uk/api/status"
 TRADE_URL   = "https://bitbargain.co.uk/api/trades"
 ONLINE_URL  = "https://bitbargain.co.uk/api/write/online"
 OFFLINE_URL = "https://bitbargain.co.uk/api/write/offline"
+BUY_URL     = "https://bitbargain.co.uk/api/buy"
 
 class BitBargain():
     def __init__(self, login, api_key):
@@ -39,10 +40,15 @@ class BitBargain():
         request = urllib.request.Request(URL)
         request.add_header("Content-Type", "application/x-www-form-urlencoded;charset=utf-8")
         request.add_header("User-Agent", self.agent)
-        f = urllib.request.urlopen(request, data)
+        f = urllib.request.urlopen(request, data, 5)
         response = f.read()
         response = response.decode('utf-8')
-        return json.loads(response)
+        try:
+            data = json.loads(response)
+        except ValueError:
+            print('INVALID JSON %s' % response)
+            return False
+        return data
 
 
     def getTrades(self, **kwargs):
@@ -59,6 +65,9 @@ class BitBargain():
 
     def goOffline(self):
         return self._post(OFFLINE_URL)
+
+    def getBuys(self):
+        return self._post(BUY_URL)
         
 if __name__ == '__main__':
     import sys
